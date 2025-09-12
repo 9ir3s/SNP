@@ -120,14 +120,16 @@ def makeSVG(data, background_color, border_color):
     contentBar = "".join(["<div class='bar'></div>" for _ in range(barCount)])
     barCSS = barGen(barCount)
 
-    if data == {}:
-        #contentBar = "" #Shows/Hides the EQ bar if no song is currently playing
-        recentPlays = recentlyPlayed()
+    if not "is_playing" in data:
+        contentBar = "" #Shows/Hides the EQ bar if no song is currently playing
+        currentStatus = "Recently played:"
+        recentPlays = get(RECENTLY_PLAYING_URL)
         recentPlaysLength = len(recentPlays["items"])
         itemIndex = random.randint(0, recentPlaysLength - 1)
         item = recentPlays["items"][itemIndex]["track"]
     else:
         item = data["item"]
+        currentStatus = "Last seen playing:"
 
     if item["album"]["images"] == []:
         image = PLACEHOLDER_IMAGE
