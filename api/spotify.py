@@ -71,7 +71,7 @@ def get(url):
             url, headers={"Authorization": f"Bearer {SPOTIFY_TOKEN}"}).json()
         return response
     elif response.status_code == 204:
-        return None  # <- não tem nada tocando
+        raise Exception(f"{url} returned no data.")
     else:
         return response.json()
 
@@ -83,12 +83,11 @@ def barGen(barCount):
         anim = random.randint(500, 1000)
         # below code generates random cubic-bezier values
         x1 = random.random()
-        y1 = random.random() * 2
+        y1 = random.random()*2
         x2 = random.random()
-        y2 = random.random() * 2
+        y2 = random.random()*2
         barCSS += (
-            ".bar:nth-child({})  {{ left: {}px; animation-duration: 15s, {}ms; "
-            "animation-timing-function: ease, cubic-bezier({},{},{},{}); }}".format(
+            ".bar:nth-child({})  {{ left: {}px; animation-duration: 15s, {}ms; animation-timing-function: ease, cubic-bezier({},{},{},{}); }}".format(
                 i, left, anim, x1, y1, x2, y2
             )
         )
@@ -111,44 +110,78 @@ def getTemplate():
         print(f"Failed to load templates.\r\n```{e}```")
         return FALLBACK_THEME
 
-
 def loadImageB64(url):
     response = requests.get(url)
-    if response.status_code != 200:
-        return PLACEHOLDER_IMAGE
-    return b64encode(response.content).decode("utf-8")
+    return b64encode(response.content).decode("ascii")
 
 
-@app.route("/")
-def index():
+def makeSVG(data, background_color, border_color):
+    barCount = 84
+    contentBar = "".join(["<div class='bar'></div>" for _ in range(barCount)])
+    barCSS = barGen(barCount)
+
+    if not "is_playing" in data:
+        contentBar = "" #Shows/Hides the EQ bar if no song is currently playing
+        currentStatus = "Recently played:"
+        recentPlays = get(RECENTLY_PLAYING_URL)
+        recentPlaysLength = len(recentPlays["items"])
+        itemIndex = random.randint(0, recentPlaysLength - 1)
+        item = recentPlays["items"][itemIndex]["track"]
+    else:
+        item = data["item"]
+        currentStatus = "Last seen playing:"
+
+    if item["album"]["images"] == []:
+        image = PLACEHOLDER_IMAGE
+        barPalette = gradientGen(PLACEHOLDER_URL, 4)
+        songPalette = gradientGen(PLACEHOLDER_URL, 2)
+    else:
+        image = loadImageB64(item["album"]["images"][1]["url"])
+        barPalette = gradientGen(item["album"]["images"][1]["url"], 4)
+        songPalette = gradientGen(item["album"]["images"][1]["url"], 2)
+
+    artistName = item["artists"][0]["name"].replace("&", "&amp;")
+    songName = item["name"].replace("&", "&amp;")
+    songURI = item["external_urls"]["spotify"]
+    artistURI = item["artists"][0]["external_urls"]["spotify"]
+
+    dataDict = {
+        "contentBar": contentBar,
+        "barCSS": barCSS,
+        "artistName": artistName,
+        "songName": songName,
+        "songURI": songURI,
+        "artistURI": artistURI,
+        "image": image,
+        "status": currentStatus,
+        "background_color": background_color,
+        "border_color": border_color,
+        "barPalette": barPalette,
+        "songPalette": songPalette
+    }
+
+    return render_template(getTemplate(), **dataDict)
+
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+@app.route('/with_parameters')
+def catch_all(path):
+    background_color = request.args.get('background_color') or "181414"
+    border_color = request.args.get('border_color') or "181414"
+
     try:
-        now_playing = get(NOW_PLAYING_URL)
-        if not now_playing or not now_playing.get("is_playing"):
-            # se não tem nada tocando -> retorna vazio
-            return Response("", mimetype="text/html")
+        data = get(NOW_PLAYING_URL)
+    except Exception:
+        data = get(RECENTLY_PLAYING_URL)
 
-        item = now_playing.get("item")
-        if not item:
-            return Response("", mimetype="text/html")
+    svg = makeSVG(data, background_color, border_color)
 
-        album_art_url = item["album"]["images"][0]["url"]
-        album_art_b64 = loadImageB64(album_art_url)
+    resp = Response(svg, mimetype="image/svg+xml")
+    resp.headers["Cache-Control"] = "s-maxage=1"
 
-        palette = gradientGen(album_art_url, 10)
-        bars = barGen(20)
+    return resp
 
-        template = getTemplate()
 
-        return render_template(
-            template,
-            song=item["name"],
-            artist=", ".join([artist["name"] for artist in item["artists"]]),
-            album=item["album"]["name"],
-            album_art=album_art_b64,
-            bars=bars,
-            palette=palette,
-        )
-
-    except Exception as e:
-        print("Erro:", e)
-        return Response("", mimetype="text/html")
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", debug=True, port=os.getenv("PORT") or 5000)
