@@ -26,7 +26,7 @@ FALLBACK_THEME = "spotify.html.j2"
 REFRESH_TOKEN_URL = "https://accounts.spotify.com/api/token"
 NOW_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 RECENTLY_PLAYING_URL = (
-    "https://api.spotify.com/v1/me/player/recently-played?limit=0"
+    "https://api.spotify.com/v1/me/player/recently-played?limit=10"
 )
 
 app = Flask(__name__)
@@ -120,16 +120,16 @@ def makeSVG(data, background_color, border_color):
     contentBar = "".join(["<div class='bar'></div>" for _ in range(barCount)])
     barCSS = barGen(barCount)
 
-    if not "is_playing" in data:
-        contentBar = "" #Shows/Hides the EQ bar if no song is currently playing
-        currentStatus = "Recently played:"
-        recentPlays = get(RECENTLY_PLAYING_URL)
-        recentPlaysLength = len(recentPlays["items"])
-        itemIndex = random.randint(0, recentPlaysLength - 1)
-        item = recentPlays["items"][itemIndex]["track"]
-    else:
-        item = data["item"]
-        currentStatus = "Last seen playing:"
+#    if not "is_playing" in data:
+#        contentBar = "" #Shows/Hides the EQ bar if no song is currently playing
+#        currentStatus = "Recently played:"
+#        recentPlays = get(RECENTLY_PLAYING_URL)
+#        recentPlaysLength = len(recentPlays["items"])
+#        itemIndex = random.randint(0, recentPlaysLength - 1)
+#        item = recentPlays["items"][itemIndex]["track"]
+#    else:
+#        item = data["item"]
+#        currentStatus = "Last seen playing:"
 
     if item["album"]["images"] == []:
         image = PLACEHOLDER_IMAGE
